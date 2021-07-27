@@ -1,77 +1,123 @@
 package dao;
-import beans.Higiene;
 import beans.Medicamento;
+import util.ConnectionFactory;
+
+import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
+
 public class MedicamentosDao {
 
-    private Medicamento[] db_medicamentos;
-    private int qtdProdMedicamentoGuardados;
-    int busca;
 
-    public void inicializaVetor(){
-        db_medicamentos = new Medicamento[15];
-    }
-    public void persisteMedicamentos(Medicamento medicamento){
-        db_medicamentos[qtdProdMedicamentoGuardados] = medicamento;
-        qtdProdMedicamentoGuardados++;
-    }
-    public boolean verificaCodigo(int codigo){
-        for (int i=0; i<db_medicamentos.length; i++) {
-            if (db_medicamentos[i] != null) {
-                if (db_medicamentos[i].getCodigo() == codigo) {
-                    return false;
-                }
-            }
+    public void cadastrar(Medicamento medicamento){
+        Connection con = ConnectionFactory.getConnection();
+        PreparedStatement stmt = null;
+        try {
+            stmt = con.prepareStatement("INSERT INTO medicamento (codigo,descricao,precocompra,percentuallucro,datavencimento)VALUES(?,?,?,?,?)");
+            stmt.setInt(1, medicamento.getCodigo());
+            stmt.setString(2, medicamento.getDescricao());
+            stmt.setDouble(3, medicamento.getPrecoCompra());
+            stmt.setDouble(4, medicamento.getPercentualLucro());
+            stmt.setString(5, medicamento.getDataVencimento());
+            stmt.executeUpdate();
+            System.out.println("Salvo com sucesso");
+        }catch (SQLIntegrityConstraintViolationException e){
+            throw new RuntimeException("PRODUTO NÃO CADASTRADO POIS JÁ EXISTE OUTRO PRODUTO CADASTRADO COM O CÓDIGO INFORMADO!!!");
+        } catch (SQLException ex){
+            throw new RuntimeException("Erro ao salvar: ",ex);
+        }finally {
+            ConnectionFactory.closeConnection(con, stmt);
         }
-        return true;
     }
+
+    public List<Medicamento> listar(){
+        Connection con = ConnectionFactory.getConnection();
+        PreparedStatement stmt = null;
+        ResultSet rs = null;
+        List<Medicamento> medicamentos = new ArrayList<Medicamento>();
+        try {
+            stmt = con.prepareStatement("SELECT * FROM medicamento");
+            rs = stmt.executeQuery();
+            while (rs.next()){
+                Medicamento medicamento = new Medicamento();
+                medicamento.setCodigo(rs.getInt("codigo"));
+                medicamento.setDescricao(rs.getString("descricao"));
+                medicamento.setPrecoCompra(rs.getDouble("precocompra"));
+                medicamento.setPercentualLucro(rs.getDouble("percentuallucro"));
+                medicamento.setDataVencimento(rs.getString("datavencimento"));
+                medicamentos.add(medicamento);
+            }
+        }catch (SQLException ex){
+            throw new RuntimeException("Erro ao listar: ",ex);
+        }finally {
+            ConnectionFactory.closeConnection(con, stmt, rs);
+        }
+    return medicamentos;
+    }
+
+    public void atualizar(Medicamento medicamento, int codigo) {
+        Connection con = ConnectionFactory.getConnection();
+        PreparedStatement stmt = null;
+        try {
+            stmt = con.prepareStatement("UPDATE medicamento SET codigo=?,descricao=?,precocompra=?,percentuallucro=?, datavencimento=? WHERE codigo = ?");
+            stmt.setInt(1, medicamento.getCodigo());
+            stmt.setString(2, medicamento.getDescricao());
+            stmt.setDouble(3, medicamento.getPrecoCompra());
+            stmt.setDouble(4, medicamento.getPercentualLucro());
+            stmt.setString(5, medicamento.getDataVencimento());
+            stmt.setInt(6,codigo);
+            stmt.executeUpdate();
+        }catch (SQLException ex){
+            throw new RuntimeException("Erro ao atualizar: ",ex);
+        }finally {
+            ConnectionFactory.closeConnection(con, stmt);
+        }
+    }
+
+    public Medicamento busca(int codigo){
+        Connection con = ConnectionFactory.getConnection();
+        PreparedStatement stmt = null;
+        ResultSet rs = null;
+        try{
+            stmt = con.prepareStatement("SELECT * FROM dbdrogaria.medicamento WHERE codigo = ?");
+            stmt.setInt(1, codigo);
+            rs = stmt.executeQuery();
+            if (rs.next()){
+                Medicamento medicamento = new Medicamento();
+                medicamento.setCodigo(rs.getInt("codigo"));
+                medicamento.setDescricao(rs.getString("descricao"));
+                medicamento.setPrecoCompra(rs.getDouble("precocompra"));
+                medicamento.setPercentualLucro(rs.getDouble("percentuallucro"));
+                medicamento.setDataVencimento(rs.getString("datavencimento"));
+                return medicamento;
+            }else {
+                return null;
+            }
+        }catch (SQLException ex){
+            throw new RuntimeException("Erro ao buscar: ",ex);
+        }finally {
+            ConnectionFactory.closeConnection(con, stmt);
+        }
+    }
+
+    public void excluir(int codigo){
+        Connection con = ConnectionFactory.getConnection();
+        PreparedStatement stmt = null;
+        try {
+            stmt = con.prepareStatement("DELETE FROM medicamento WHERE codigo = ?");
+            stmt.setInt(1, codigo);
+            stmt.execute();
+        }catch (SQLException ex){
+            throw new RuntimeException("Erro ao exlcuir: ", ex);
+        }finally {
+            ConnectionFactory.closeConnection(con, stmt);
+        }
+    }
+
     public double calculaLucro(double precoCompra, double percelntualLucro){
         double percentual = percelntualLucro/100;
         double lucro = precoCompra * percentual;
         return lucro;
     }
 
-    public Higiene buscaProdutoMaisCaro(){
-        double maior = 0;
-        int indice = 0;
-        for (int i=0; i<db_medicamentos.length;){
-            if (db_medicamentos[i]!= null) {
-                if (db_medicamentos[i].getPrecoCompra() > maior) {
-                    maior = db_medicamentos[i].getPrecoCompra();
-                    indice = i;
-                }
-            }
-            i++;
-        }
-        return db_medicamentos[indice];
-    }
-    public void relatorio(){
-        for (int i=0; i<db_medicamentos.length;i++){
-            if (db_medicamentos[i] != null) {
-                System.out.println(db_medicamentos[i]);
-            }
-        }
-    }
-    public void alterar(int codigo, String descricao, double precoCompra, double percentualLucro, String dataVencimento) {
-        Medicamento alterar = new Medicamento(codigo, descricao, precoCompra, percentualLucro, dataVencimento);
-        db_medicamentos[busca] = alterar;
-    }
-    public Higiene busca(int codigo){
-        for (busca=0; busca<db_medicamentos.length; busca++){
-            if (db_medicamentos[busca] != null) {
-                if (db_medicamentos[busca].getCodigo() == codigo && db_medicamentos[busca] != null) {
-                    return db_medicamentos[busca];
-                }
-            }
-        }
-        return null;
-    }
-    public void exclui(int codigo){
-        for (int i = 0; i< db_medicamentos.length; i++){
-            if (db_medicamentos[i] != null) {
-                if (db_medicamentos[i].getCodigo() == codigo) {
-                    db_medicamentos[i] = null;
-                }
-            }
-        }
-    }
 }
